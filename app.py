@@ -2,8 +2,10 @@ import streamlit as st
 from PIL import Image
 import cv2
 import numpy as np
+import pandas as pd
 
 from src.pipeline import ANPRPipeline
+from src.database import DatabaseManager
 
 # -----------------------------------
 # Streamlit Configuration
@@ -15,14 +17,14 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🚗 Vehicle Number Plate Recognition")
+st.title("🚗 AI Smart Parking Management System")
 
 st.write(
-    "Upload a vehicle image to detect license plates."
+    "Upload a vehicle image to detect license plates and register vehicle entry."
 )
 
 # -----------------------------------
-# Load Pipeline
+# Load Resources
 # -----------------------------------
 
 @st.cache_resource
@@ -30,7 +32,13 @@ def load_pipeline():
     return ANPRPipeline()
 
 
+@st.cache_resource
+def load_database():
+    return DatabaseManager()
+
+
 pipeline = load_pipeline()
+db = load_database()
 
 # -----------------------------------
 # Upload Image
@@ -54,10 +62,10 @@ if uploaded_file is not None:
     image_np = np.array(image)
     image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
-    # Run Pipeline
+    # Run detection pipeline
     result, plates = pipeline.process(image_cv)
 
-    # Draw bounding boxes
+    # Draw detection boxes
     annotated_image = result.plot()
     annotated_image = cv2.cvtColor(
         annotated_image,
@@ -65,7 +73,7 @@ if uploaded_file is not None:
     )
 
     # -----------------------------------
-    # Show Images
+    # Display Images
     # -----------------------------------
 
     col1, col2 = st.columns(2)
@@ -119,7 +127,7 @@ if uploaded_file is not None:
 
         for index, plate in enumerate(plates):
 
-            st.markdown(f"### Plate {index + 1}")
+            st.markdown(f"## Plate {index + 1}")
 
             plate_rgb = cv2.cvtColor(
                 plate["image"],
@@ -131,19 +139,137 @@ if uploaded_file is not None:
                 width=300
             )
 
+            st.metric(
+                "Detection Confidence",
+                f"{plate['confidence'] * 100:.2f}%"
+            )
+
+            st.code(
+                f"Bounding Box: {plate['bbox']}"
+            )
+
+            plate_number = st.text_input(
+                f"Plate Number {index + 1}",
+                key=f"plate_{index}"
+            )
+
             col1, col2 = st.columns(2)
 
             with col1:
 
-                st.metric(
-                    "Confidence",
-                    f"{plate['confidence'] * 100:.2f}%"
-                )
+                if st.button(
+                    "🚗 Vehicle Entry",
+                    key=f"entry_{index}"
+                ):
+
+                    if plate_number.strip() == "":
+
+                        st.error("Please enter the vehicle number.")
+
+                    else:
+
+                        success = db.add_vehicle(
+                            plate_number.upper()
+                        )
+
+                        if success:
+
+                            st.success(
+                                f"{plate_number.upper()} entered successfully."
+                            )
+
+                        else:
+
+                            st.warning(
+                                f"{plate_number.upper()} is already inside."
+                            )
 
             with col2:
 
-                st.code(
-                    f"Bounding Box: {plate['bbox']}"
-                )
+                if st.button(
+                    "🚙 Vehicle Exit",
+                    key=f"exit_{index}"
+                ):
+
+                    if plate_number.strip() == "":
+
+                        st.error("Please enter the vehicle number.")
+
+                    else:
+
+                        success = db.vehicle_exit(
+                            plate_number.upper()
+                        )
+
+                        if success:
+
+                            st.success(
+                                f"{plate_number.upper()} exited successfully."
+                            )
+
+                        else:
+
+                            st.error(
+                                "Vehicle not found."
+                            )
 
             st.divider()
+
+# -----------------------------------
+# Dashboard Statistics
+# -----------------------------------
+
+stats = db.get_dashboard_stats()
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(
+        "🚗 Vehicles Inside",
+        stats["inside"]
+    )
+
+with col2:
+    st.metric(
+        "🚙 Total Vehicles",
+        stats["total"]
+    )
+
+with col3:
+    st.metric(
+        "💰 Total Revenue",
+        f"₹{stats['revenue']}"
+    )
+
+st.divider()
+
+# -----------------------------------
+# Parking Records Dashboard
+# -----------------------------------
+
+st.header("🅿️ Parking Records")
+
+records = db.get_all_records()
+
+if len(records) == 0:
+
+    st.info("No parking records found.")
+
+else:
+
+    df = pd.DataFrame(
+        records,
+        columns=[
+            "Plate Number",
+            "Entry Time",
+            "Exit Time",
+            "Status",
+            "Parking Fee (₹)"
+        ]
+    )
+
+    st.dataframe(
+        df,
+        width="stretch",
+        hide_index=True
+    )

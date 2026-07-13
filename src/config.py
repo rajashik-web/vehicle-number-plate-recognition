@@ -1,9 +1,14 @@
 """
 Application configuration.
 """
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 MODEL_PATH = "models/license_plate/best.pt"
 
+DATABASE_URL = os.getenv("DATABASE_URL")
 OUTPUT_FOLDER = "data/output"
 
 SUPPORTED_IMAGE_TYPES = [

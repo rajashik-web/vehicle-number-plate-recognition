@@ -2,4 +2,4 @@ from src.database import DatabaseManager
 
 db = DatabaseManager()
 
-print("✅ PostgreSQL Connected Successfully")
+db.vehicle_exit("MH20EJ0364")
