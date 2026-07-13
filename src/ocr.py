@@ -1,15 +1,26 @@
-from paddleocr import PaddleOCR
-
-
 class OCRReader:
+    """
+    OCR interface.
+
+    This class will later use PaddleOCR to read
+    license plate text.
+    """
+
     def __init__(self):
-        self.reader = PaddleOCR(
-            use_angle_cls=True,
-            lang="en"
-        )
+        pass
 
     def read_text(self, image):
-        result = self.reader.ocr(image)
+        """
+        Placeholder implementation.
 
-        return result
-    
+        Args:
+            image: Cropped license plate image.
+
+        Returns:
+            dict
+        """
+
+        return {
+            "text": "",
+            "confidence": 0.0
+        }
