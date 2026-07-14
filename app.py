@@ -2,11 +2,13 @@ import streamlit as st
 from PIL import Image
 import cv2
 import numpy as np
-import pandas as pd
 
 from src.pipeline import ANPRPipeline
-from src.database import DatabaseManager
+from src.services.parking_manager import ParkingManager
+from src.ui.dashboard import show_dashboard
+from src.ui.records import show_records
 from src.image_storage import ImageStorage
+from src.ui.search import show_search
 
 # -----------------------------------
 # Streamlit Configuration
@@ -30,13 +32,8 @@ def load_pipeline():
     return ANPRPipeline()
 
 
-@st.cache_resource
-def load_database():
-    return DatabaseManager()
-
-
 pipeline = load_pipeline()
-db = load_database()
+parking = ParkingManager()
 storage = ImageStorage()
 
 # -----------------------------------
@@ -140,23 +137,17 @@ if uploaded_file is not None:
 
                 if st.button("🚗 Vehicle Entry", key=f"entry_{index}"):
 
-                    if plate_number.strip() == "":
+                    success, message = parking.vehicle_entry(
+                        plate_number
+                    )
 
-                        st.error("Please enter the vehicle number.")
+                    if success:
+
+                        st.success(message)
 
                     else:
 
-                        image_path = storage.save(plate_number.upper(), image_cv)
-
-                        success = db.add_vehicle(plate_number.upper(), image_path)
-
-                        if success:
-
-                            st.success(f"{plate_number.upper()} entered successfully.")
-
-                        else:
-
-                            st.warning(f"{plate_number.upper()} is already inside.")
+                        st.error(message)
 
             with col2:
 
@@ -168,7 +159,7 @@ if uploaded_file is not None:
 
                     else:
 
-                        success = db.vehicle_exit(plate_number.upper())
+                        success = parking.vehicle_exit(plate_number.upper())
 
                         if success:
 
@@ -179,81 +170,21 @@ if uploaded_file is not None:
                             st.error("Vehicle not found.")
 
             st.divider()
-
 # -----------------------------------
 # Dashboard Statistics
 # -----------------------------------
 
-stats = db.get_dashboard_stats()
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.metric("🚗 Vehicles Inside", stats["inside"])
-
-with col2:
-    st.metric("🚙 Total Vehicles", stats["total"])
-
-with col3:
-    st.metric("💰 Total Revenue", f"₹{stats['revenue']}")
-
-st.divider()
+show_dashboard(parking.dashboard())
 
 # -----------------------------------
-# Parking Records Dashboard
+# Parking Records
 # -----------------------------------
 
-st.header("🅿️ Parking Records")
+show_records(parking.records())
 
-records = db.get_all_records()
-
-if len(records) == 0:
-
-    st.info("No parking records found.")
-
-else:
-
-    df = pd.DataFrame(
-        records,
-        columns=[
-            "Plate Number",
-            "Entry Time",
-            "Exit Time",
-            "Status",
-            "Parking Fee (₹)",
-        ],
-    )
-
-    # -----------------------------------
-    # Search Vehicle
-    # -----------------------------------
-
-    st.divider()
-
-    st.header("🔍 Search Vehicle")
-
-    search_plate = st.text_input("Enter Vehicle Number")
-
-    if st.button("Search"):
-
-        if search_plate.strip() == "":
-
-            st.warning("Please enter a vehicle number.")
-
-        else:
-
-            record = db.search_vehicle(search_plate.upper())
-
-            if record is None:
-
-                st.error("Vehicle not found.")
-
-            else:
-
-                st.success("Vehicle Found")
-
-                st.write(f"**Plate Number:** {record[0]}")
-                st.write(f"**Entry Time:** {record[1]}")
-                st.write(f"**Exit Time:** {record[2]}")
-                st.write(f"**Status:** {record[3]}")
-                st.write(f"**Parking Fee:** ₹{record[4]}")
+# -----------------------------------
+# Search Vehicle
+# -----------------------------------
+show_search(
+    parking
+)
