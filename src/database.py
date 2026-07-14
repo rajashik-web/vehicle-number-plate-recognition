@@ -31,7 +31,9 @@ class DatabaseManager:
 
             status VARCHAR(20),
 
-            parking_fee DECIMAL(10,2)
+            parking_fee DECIMAL(10,2),
+
+            image_path TEXT
 
         );
         """)
@@ -63,7 +65,7 @@ class DatabaseManager:
 
         return exists
         
-    def add_vehicle(self, plate_number):
+    def add_vehicle(self, plate_number, image_path):
 
         if self.vehicle_exists(plate_number):
             print(f"{plate_number} is already inside.")
@@ -79,17 +81,26 @@ class DatabaseManager:
                 plate_number,
                 entry_time,
                 status,
-                parking_fee
+                parking_fee,
+                image_path
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES
+            (
+                %s,
+                %s,
+                %s,
+                %s,
+                %s
+            )
             """,
             (
                 plate_number,
                 datetime.now(),
                 "INSIDE",
-                0.0
+                0,
+                image_path
             )
-        )
+        )   # <-- This closing bracket was missing
 
         conn.commit()
 
