@@ -148,10 +148,25 @@ if uploaded_file is not None:
                 f"Bounding Box: {plate['bbox']}"
             )
 
+            plate_key = f"plate_{index}"
+
+            # Update OCR result whenever a new image is processed
+            st.session_state[plate_key] = plate["text"]
+
             plate_number = st.text_input(
                 f"Plate Number {index + 1}",
-                key=f"plate_{index}"
+                key=plate_key
             )
+
+            st.caption(
+    f"OCR Confidence: {plate['ocr_confidence']:.2f}"
+)
+
+            if plate["text"] == "":
+
+                st.warning(
+                    "OCR could not confidently recognize the plate. Please enter it manually."
+                )
 
             col1, col2 = st.columns(2)
 
@@ -268,8 +283,40 @@ else:
         ]
     )
 
-    st.dataframe(
-        df,
-        width="stretch",
-        hide_index=True
+    # -----------------------------------
+    # Search Vehicle
+    # -----------------------------------
+
+    st.divider()
+
+    st.header("🔍 Search Vehicle")
+
+    search_plate = st.text_input(
+        "Enter Vehicle Number"
     )
+
+    if st.button("Search"):
+
+        if search_plate.strip() == "":
+
+            st.warning("Please enter a vehicle number.")
+
+        else:
+
+            record = db.search_vehicle(
+                search_plate.upper()
+            )
+
+            if record is None:
+
+                st.error("Vehicle not found.")
+
+            else:
+
+                st.success("Vehicle Found")
+
+                st.write(f"**Plate Number:** {record[0]}")
+                st.write(f"**Entry Time:** {record[1]}")
+                st.write(f"**Exit Time:** {record[2]}")
+                st.write(f"**Status:** {record[3]}")
+                st.write(f"**Parking Fee:** ₹{record[4]}")

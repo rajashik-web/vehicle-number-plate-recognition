@@ -229,3 +229,32 @@ class DatabaseManager:
             "total": total_vehicles,
             "revenue": total_revenue
         }
+        
+        
+    def search_vehicle(self, plate_number):
+
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                plate_number,
+                entry_time,
+                exit_time,
+                status,
+                parking_fee
+            FROM parking_records
+            WHERE plate_number = %s
+            ORDER BY entry_time DESC
+            LIMIT 1
+            """,
+            (plate_number,)
+        )
+
+        record = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        return record
