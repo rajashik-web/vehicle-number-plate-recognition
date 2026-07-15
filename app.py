@@ -7,6 +7,7 @@ from src.pipeline import ANPRPipeline
 from src.services.parking_manager import ParkingManager
 from src.ui.dashboard import show_dashboard
 from src.ui.records import show_records
+from src.ui.live_camera import show_live_camera
 from src.image_storage import ImageStorage
 from src.ui.search import show_search
 
