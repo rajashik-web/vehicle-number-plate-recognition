@@ -11,16 +11,19 @@ class VehicleSession:
     def start(self):
 
         self.active = True
-
         self.frames = 0
-
         self.plates.clear()
 
-    def add_plate(self, text):
+    def add_plate(self, text, image):
 
         if text != "":
 
-            self.plates.append(text)
+            self.plates.append(
+                {
+                    "text": text,
+                    "image": image
+                }
+            )
 
         self.frames += 1
 
@@ -33,7 +36,5 @@ class VehicleSession:
     def reset(self):
 
         self.active = False
-
         self.frames = 0
-
         self.plates.clear()

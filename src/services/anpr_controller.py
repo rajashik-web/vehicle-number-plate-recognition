@@ -21,9 +21,12 @@ class ANPRController:
 
         self.voter.clear()
 
-    def add_plate(self, text):
+    def add_plate(self, text, image):
 
-        self.session.add_plate(text)
+        self.session.add_plate(
+            text,
+            image
+        )
 
         self.voter.add(text)
 
@@ -31,11 +34,21 @@ class ANPRController:
 
         self.state = ANPRState.PROCESSING
 
-        result = self.voter.best_result()
+        best_text = self.voter.best_result()
+
+        best_image = None
+
+        for plate in self.session.plates:
+
+            if plate["text"] == best_text:
+
+                best_image = plate["image"]
+
+                break
 
         self.reset()
 
-        return result
+        return best_text, best_image
 
     def reset(self):
 

@@ -38,16 +38,40 @@ parking = ParkingManager()
 storage = ImageStorage()
 
 # -----------------------------------
+# Sidebar Navigation
+# -----------------------------------
+
+page = st.sidebar.radio(
+    "📋 Navigation",
+    [
+        "Upload Image",
+        "🎥 Live Camera",
+        "📊 Dashboard",
+        "📋 Records",
+        "🔍 Search"
+    ]
+)
+
+# -----------------------------------
 # Upload Image
 # -----------------------------------
 
-uploaded_file = st.file_uploader("Choose a vehicle image", type=["jpg", "jpeg", "png"])
+if page == "Upload Image":
+
+    uploaded_file = st.file_uploader(
+        "Choose a vehicle image",
+        type=["jpg", "jpeg", "png"]
+    )
+
+else:
+
+    uploaded_file = None
 
 # -----------------------------------
 # Process Image
 # -----------------------------------
 
-if uploaded_file is not None:
+if page == "Upload Image" and uploaded_file is not None:
 
     # Read uploaded image
     image = Image.open(uploaded_file)
@@ -138,17 +162,25 @@ if uploaded_file is not None:
 
                 if st.button("🚗 Vehicle Entry", key=f"entry_{index}"):
 
-                    success, message = parking.vehicle_entry(
-                        plate_number
-                    )
+                    if plate_number.strip() == "":
 
-                    if success:
-
-                        st.success(message)
+                        st.error("Please enter the vehicle number.")
 
                     else:
 
-                        st.error(message)
+                        image_path = storage.save(plate_number.upper(), plate["image"])
+
+                        success, message = parking.vehicle_entry(
+                            plate_number.upper(), image_path
+                        )
+
+                        if success:
+
+                            st.success(message)
+
+                        else:
+
+                            st.error(message)
 
             with col2:
 
@@ -160,7 +192,15 @@ if uploaded_file is not None:
 
                     else:
 
-                        success = parking.vehicle_exit(plate_number.upper())
+                        success, message = parking.vehicle_exit(plate_number.upper())
+
+                        if success:
+
+                            st.success(message)
+
+                        else:
+
+                            st.error(message)
 
                         if success:
 
@@ -172,20 +212,27 @@ if uploaded_file is not None:
 
             st.divider()
 # -----------------------------------
-# Dashboard Statistics
+# Other Pages
 # -----------------------------------
 
-show_dashboard(parking.dashboard())
+if page == "📊 Dashboard":
 
-# -----------------------------------
-# Parking Records
-# -----------------------------------
+    show_dashboard(
+        parking.dashboard()
+    )
 
-show_records(parking.records())
+elif page == "📋 Records":
 
-# -----------------------------------
-# Search Vehicle
-# -----------------------------------
-show_search(
-    parking
-)
+    show_records(
+        parking.records()
+    )
+
+elif page == "🔍 Search":
+
+    show_search(
+        parking
+    )
+
+elif page == "🎥 Live Camera":
+
+    show_live_camera()

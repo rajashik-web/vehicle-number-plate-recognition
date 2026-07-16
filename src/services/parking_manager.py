@@ -7,31 +7,36 @@ class ParkingManager:
 
         self.db = DatabaseManager()
 
-    def vehicle_entry(self, plate_number):
+    def vehicle_entry(self, plate_number, image_path=""):
 
-        if plate_number.strip() == "":
+        plate_number = plate_number.strip().upper()
+
+        if plate_number == "":
             return False, "Please enter the vehicle number."
 
         success = self.db.add_vehicle(
-            plate_number.upper()
+            plate_number,
+            image_path
         )
 
         if success:
-            return True, f"{plate_number.upper()} entered successfully."
+            return True, f"{plate_number} entered successfully."
 
-        return False, f"{plate_number.upper()} is already inside."
+        return False, f"{plate_number} is already inside."
 
     def vehicle_exit(self, plate_number):
 
-        if plate_number.strip() == "":
+        plate_number = plate_number.strip().upper()
+
+        if plate_number == "":
             return False, "Please enter the vehicle number."
 
         success = self.db.vehicle_exit(
-            plate_number.upper()
+            plate_number
         )
 
         if success:
-            return True, f"{plate_number.upper()} exited successfully."
+            return True, f"{plate_number} exited successfully."
 
         return False, "Vehicle not found."
 
