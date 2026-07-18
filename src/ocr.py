@@ -1,79 +1,103 @@
-import easyocr
+import logging
+import os
 import cv2
+import easyocr
 
 from src.preprocessing import PlatePreprocessor
+from src.config import OUTPUT_FOLDER
+
+logger = logging.getLogger(__name__)
+
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 
 class OCRReader:
 
     def __init__(self):
-
-        # Load EasyOCR once
-        self.reader = easyocr.Reader(
-            ['en'],
-            gpu=False
-        )
-
-        # Image preprocessor
+        # Load EasyOCR once at startup
+        self.reader = easyocr.Reader(["en"], gpu=False)
         self.preprocessor = PlatePreprocessor()
 
-    def read_text(self, image):
+    def read_candidates(self, image):
+        """
+        Run OCR on multiple image variants.
 
-        # Enhance plate image
-        processed = self.preprocessor.process(
-            image
-        )
-        cv2.imwrite(
-    "data/output/ocr_input.jpg",
-    processed
-)
-        
+        Returns:
+            [
+                {
+                    "variant": 1,
+                    "text": "...",
+                    "confidence": 0.95,
+                    "boxes": 4
+                }
+            ]
+        """
 
-        # OCR
-        results = self.reader.readtext(
-    processed,
-    allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-    paragraph=False,
-    decoder="beamsearch",
-    width_ths=0.7,
-    height_ths=0.7
-)
-        if len(results) == 0:
+        variants = self.preprocessor.generate_variants(image)
 
-            return {
-                "text": "",
-                "confidence": 0.0
-            }
+        candidates = []
 
-        print("\n" + "=" * 60)
-        print("EasyOCR Results")
-        print("=" * 60)
+        for index, variant in enumerate(variants):
 
-        for i, item in enumerate(results):
+            results = self.reader.readtext(
+                variant,
+                allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+                paragraph=False,
+                decoder="beamsearch",
+                width_ths=0.7,
+                height_ths=0.7,
+            )
 
-            bbox = item[0]
-            text = item[1]
-            confidence = item[2]
+            if not results:
+                continue
 
-            print(f"{i+1}.")
-            print("Text       :", text)
-            print("Confidence :", confidence)
-            print("Box        :", bbox)
-            print("-" * 40)
+            # Sort text boxes from left to right
+            results = sorted(
+                results,
+                key=lambda r: r[0][0][0]
+            )
 
-        if len(results) == 0:
+            words = []
+            confidences = []
 
-            return {
-                "text": "",
-                "confidence": 0.0
-            }
+            for box, text, conf in results:
 
-        best = max(
-            results,
-            key=lambda x: x[2]
-        )
+                text = text.strip().upper()
 
-        return {
-            "text": best[1],
-            "confidence": float(best[2])
-        }
+                if not text:
+                    continue
+
+                words.append(text)
+                confidences.append(conf)
+
+            if not words:
+                continue
+
+            final_text = "".join(words)
+
+            avg_conf = sum(confidences) / len(confidences)
+
+            candidates.append(
+                {
+                    "variant": index + 1,
+                    "text": final_text,
+                    "confidence": float(avg_conf),
+                    "boxes": len(words),
+                }
+            )
+
+        print("\n" + "=" * 70)
+        print("OCR Candidates")
+        print("=" * 70)
+
+        for c in candidates:
+            print(
+                f"Variant {c['variant']} | "
+                f"Text: {c['text']} | "
+                f"Confidence: {c['confidence']:.3f} | "
+                f"Boxes: {c['boxes']}"
+            )
+
+        print("=" * 70)
+
+        return candidates

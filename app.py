@@ -21,7 +21,19 @@ st.set_page_config(
 
 st.title("🚗 AI Smart Parking Management System")
 
-st.write("Upload a vehicle image to detect license plates and register vehicle entry.")
+st.markdown("""
+AI-powered parking management system.
+
+### Features
+
+- 🚗 Automatic Vehicle Entry
+- 🚙 Automatic Vehicle Exit
+- 🎥 Live Camera Detection
+- 📊 Dashboard
+- 📋 Parking Records
+- 🔍 Vehicle Search
+- 🤖 Number Plate Recognition
+""")
 
 # -----------------------------------
 # Load Resources
@@ -131,85 +143,89 @@ if page == "Upload Image" and uploaded_file is not None:
 
         for index, plate in enumerate(plates):
 
-            st.markdown(f"## Plate {index + 1}")
+            title = plate["text"] if plate["text"] else f"Plate {index + 1}"
+
+            st.subheader(f"🚗 {title}")
 
             plate_rgb = cv2.cvtColor(plate["image"], cv2.COLOR_BGR2RGB)
 
-            st.image(plate_rgb, width=300)
-
-            st.metric("Detection Confidence", f"{plate['confidence'] * 100:.2f}%")
-
-            st.code(f"Bounding Box: {plate['bbox']}")
-
-            plate_key = f"plate_{index}"
-
-            # Update OCR result whenever a new image is processed
-            st.session_state[plate_key] = plate["text"]
-
-            plate_number = st.text_input(f"Plate Number {index + 1}", key=plate_key)
-
-            st.caption(f"OCR Confidence: {plate['ocr_confidence']:.2f}")
-
-            if plate["text"] == "":
-
-                st.warning(
-                    "OCR could not confidently recognize the plate. Please enter it manually."
-                )
+            st.image(
+                plate_rgb,
+                width=300
+            )
 
             col1, col2 = st.columns(2)
 
             with col1:
-
-                if st.button("🚗 Vehicle Entry", key=f"entry_{index}"):
-
-                    if plate_number.strip() == "":
-
-                        st.error("Please enter the vehicle number.")
-
-                    else:
-
-                        image_path = storage.save(plate_number.upper(), plate["image"])
-
-                        success, message = parking.vehicle_entry(
-                            plate_number.upper(), image_path
-                        )
-
-                        if success:
-
-                            st.success(message)
-
-                        else:
-
-                            st.error(message)
+                st.metric(
+                    "Detection Confidence",
+                    f"{plate['confidence'] * 100:.2f}%"
+                )
 
             with col2:
+                st.metric(
+                    "OCR Confidence",
+                    f"{plate['ocr_confidence'] * 100:.2f}%"
+                )
 
-                if st.button("🚙 Vehicle Exit", key=f"exit_{index}"):
+            
 
-                    if plate_number.strip() == "":
+            plate_key = f"{uploaded_file.name}_{index}"
 
-                        st.error("Please enter the vehicle number.")
+            if plate_key not in st.session_state:
+                st.session_state[plate_key] = plate["text"]
+
+            plate_number = st.text_input(f"Plate Number {index + 1}", key=plate_key)
+
+            with st.expander("Developer Details"):
+
+                st.write(f"Bounding Box : {plate['bbox']}")
+
+                st.write(
+                    f"Detection Confidence : {plate['confidence']:.2f}"
+                )
+
+                st.write(
+                    f"OCR Confidence : {plate['ocr_confidence']:.2f}"
+                )
+
+            if plate["text"] == "":
+
+                st.warning(
+                    "No text was returned from OCR."
+                )
+
+            
+            if st.button(
+                "🚗 Save Parking Record",
+                key=f"process_{index}"
+            ):
+
+                if plate_number.strip() == "":
+
+                    st.error(
+                        "Please enter vehicle number."
+                    )
+
+                else:
+
+                    image_path = storage.save(
+                        plate_number.upper(),
+                        plate["image"]
+                    )
+
+                    success, message = parking.process_vehicle(
+                        plate_number.upper(),
+                        image_path
+                    )
+
+                    if success:
+
+                        st.toast(message, icon="🚗")
 
                     else:
 
-                        success, message = parking.vehicle_exit(plate_number.upper())
-
-                        if success:
-
-                            st.success(message)
-
-                        else:
-
-                            st.error(message)
-
-                        if success:
-
-                            st.success(f"{plate_number.upper()} exited successfully.")
-
-                        else:
-
-                            st.error("Vehicle not found.")
-
+                        st.error(message)
             st.divider()
 # -----------------------------------
 # Other Pages

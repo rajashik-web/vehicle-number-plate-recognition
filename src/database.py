@@ -1,5 +1,7 @@
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from datetime import datetime
+
 
 from src.config import DATABASE_URL
 from src.parking_service import ParkingService
@@ -16,7 +18,7 @@ class DatabaseManager:
     def create_table(self):
 
         conn = self.connect()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS parking_records (
@@ -46,7 +48,7 @@ class DatabaseManager:
     def vehicle_exists(self, plate_number):
 
         conn = self.connect()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute(
             """
@@ -72,7 +74,7 @@ class DatabaseManager:
             return False
 
         conn = self.connect()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute(
             """
@@ -114,8 +116,7 @@ class DatabaseManager:
     def get_all_records(self):
 
         conn = self.connect()
-
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("""
             SELECT
@@ -123,7 +124,8 @@ class DatabaseManager:
                 entry_time,
                 exit_time,
                 status,
-                parking_fee
+                parking_fee,
+                image_path
             FROM parking_records
             ORDER BY entry_time DESC
         """)
@@ -139,7 +141,7 @@ class DatabaseManager:
     def vehicle_exit(self, plate_number):
 
         conn = self.connect()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute(
             """
@@ -208,7 +210,7 @@ class DatabaseManager:
     def get_dashboard_stats(self):
 
         conn = self.connect()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         # Vehicles currently inside
         cursor.execute("""
@@ -236,16 +238,17 @@ class DatabaseManager:
         conn.close()
 
         return {
-            "inside": vehicles_inside,
-            "total": total_vehicles,
-            "revenue": total_revenue
-        }
+    "inside": vehicles_inside,
+    "total": total_vehicles,
+    "revenue": float(total_revenue),
+    "available": max(0, 100 - vehicles_inside)
+}
         
         
     def search_vehicle(self, plate_number):
 
         conn = self.connect()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute(
             """
@@ -254,7 +257,8 @@ class DatabaseManager:
                 entry_time,
                 exit_time,
                 status,
-                parking_fee
+                parking_fee,
+                image_path
             FROM parking_records
             WHERE plate_number = %s
             ORDER BY entry_time DESC

@@ -4,7 +4,7 @@ from src.camera import Camera
 from src.pipeline import ANPRPipeline
 from src.services.anpr_controller import ANPRController
 from src.services.parking_manager import ParkingManager
-from src.config import MAX_MISSING_FRAMES
+from src.image_storage import ImageStorage
 
 
 camera = Camera()
@@ -12,9 +12,12 @@ pipeline = ANPRPipeline()
 
 controller = ANPRController()
 parking = ParkingManager()
+storage = ImageStorage()
 
 collecting = False
 missing_frames = 0
+
+MAX_MISSING = 15
 
 
 while True:
@@ -24,9 +27,9 @@ while True:
     if frame is None:
         break
 
-    # ----------------------------------
+    # -------------------------------
     # Run ANPR Pipeline
-    # ----------------------------------
+    # -------------------------------
 
     result, plates = pipeline.process(frame)
 
@@ -34,9 +37,9 @@ while True:
 
     valid_plate_found = False
 
-    # ----------------------------------
+    # -------------------------------
     # Process OCR Results
-    # ----------------------------------
+    # -------------------------------
 
     for plate in plates:
 
@@ -48,36 +51,40 @@ while True:
 
         det_conf = plate["confidence"]
 
-        # -------------------------
-        # Valid Plate
-        # -------------------------
+        # Display label
 
-        if plate_text:
+        if plate_text != "":
 
             valid_plate_found = True
+
+            # Start collecting only once
 
             if not collecting:
 
                 collecting = True
+
                 controller.start()
 
-                print("\n==============================")
-                print("Started OCR Session")
-                print("==============================")
+                print("\nStarted OCR Session")
 
-            controller.add_plate(plate_text)
+            controller.add_plate(
+    plate_text,
+    plate["image"]
+)
 
-        # -------------------------
-        # Display Label
-        # -------------------------
+            label = (
+                f"{plate_text} | "
+                f"OCR:{ocr_conf:.2f} "
+                f"DET:{det_conf:.2f}"
+            )
 
-        status = plate_text if plate_text else "Unknown"
+        else:
 
-        label = (
-            f"{status} | "
-            f"OCR:{ocr_conf:.2f} | "
-            f"DET:{det_conf:.2f}"
-        )
+            label = (
+                f"Unknown | "
+                f"OCR:{ocr_conf:.2f} "
+                f"DET:{det_conf:.2f}"
+            )
 
         cv2.putText(
             output,
@@ -89,45 +96,53 @@ while True:
             2
         )
 
-    # ----------------------------------
-    # Vehicle Visible
-    # ----------------------------------
+    # -------------------------------
+    # Vehicle still visible
+    # -------------------------------
 
     if valid_plate_found:
 
         missing_frames = 0
 
-    elif collecting:
+    else:
 
-        missing_frames += 1
+        if collecting:
 
-    # ----------------------------------
-    # Vehicle Left Camera
-    # ----------------------------------
+            missing_frames += 1
 
-    if collecting and missing_frames > MAX_MISSING_FRAMES:
+    # -------------------------------
+    # Vehicle left camera
+    # -------------------------------
 
-        print("\n==============================")
-        print("Vehicle Left Camera")
-        print("==============================")
+    if collecting and missing_frames > MAX_MISSING:
 
-        best_plate = controller.finish()
+        print("\nVehicle Left Camera")
+
+        best_plate, best_image = controller.finish()
 
         print("Best Plate :", best_plate)
 
         if best_plate:
 
+            image_path = storage.save(
+                best_plate,
+                best_image
+            )
+
             success, message = parking.process_vehicle(
-    best_plate
+    best_plate,
+    image_path
 )
+
             print(message)
 
         collecting = False
+
         missing_frames = 0
 
-    # ----------------------------------
+    # -------------------------------
     # Display
-    # ----------------------------------
+    # -------------------------------
 
     cv2.imshow(
         "Live ANPR",

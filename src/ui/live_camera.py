@@ -1,42 +1,156 @@
-import streamlit as st
 import cv2
+import streamlit as st
 
 from src.camera import Camera
+from src.pipeline import ANPRPipeline
+from src.services.anpr_controller import ANPRController
+from src.services.parking_manager import ParkingManager
+from src.image_storage import ImageStorage
 
 
 def show_live_camera():
 
-    st.header("🎥 Live Camera")
+    st.header("🎥 Live ANPR Camera")
 
-    start = st.button("▶ Start Camera")
+    if "camera_running" not in st.session_state:
+        st.session_state.camera_running = False
 
-    stop = st.button("⏹ Stop")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("▶ Start Camera"):
+            st.session_state.camera_running = True
+
+    with col2:
+        if st.button("⏹ Stop Camera"):
+            st.session_state.camera_running = False
 
     frame_placeholder = st.empty()
 
-    if start:
+    status_placeholder = st.empty()
 
-        camera = Camera()
+    if not st.session_state.camera_running:
+        return
 
-        while True:
+    camera = Camera()
+    pipeline = ANPRPipeline()
 
-            frame = camera.read()
+    controller = ANPRController()
 
-            if frame is None:
-                break
+    parking = ParkingManager()
 
-            frame = cv2.cvtColor(
-                frame,
-                cv2.COLOR_BGR2RGB
+    storage = ImageStorage()
+
+    collecting = False
+
+    missing_frames = 0
+
+    MAX_MISSING = 15
+
+    while st.session_state.camera_running:
+
+        frame = camera.read()
+
+        if frame is None:
+            break
+
+        result, plates = pipeline.process(frame)
+
+        output = result.plot()
+
+        valid_plate_found = False
+
+        for plate in plates:
+
+            x1, y1, x2, y2 = plate["bbox"]
+
+            text = plate["text"]
+
+            det_conf = plate["confidence"]
+
+            ocr_conf = plate["ocr_confidence"]
+
+            if text != "":
+
+                valid_plate_found = True
+
+                if not collecting:
+
+                    collecting = True
+
+                    controller.start()
+
+                controller.add_plate(
+                    text,
+                    plate["image"]
+                )
+
+                label = (
+                    f"{text} "
+                    f"OCR:{ocr_conf:.2f} "
+                    f"DET:{det_conf:.2f}"
+                )
+
+            else:
+
+                label = (
+                    f"Unknown "
+                    f"OCR:{ocr_conf:.2f}"
+                )
+
+            cv2.putText(
+                output,
+                label,
+                (x1, max(y1 - 10, 20)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (0, 255, 0),
+                2
             )
 
-            frame_placeholder.image(
-                frame,
-                channels="RGB",
-                use_container_width=True
-            )
+        if valid_plate_found:
 
-            if stop:
-                break
+            missing_frames = 0
 
-        camera.release()
+        else:
+
+            if collecting:
+                missing_frames += 1
+
+        if collecting and missing_frames > MAX_MISSING:
+
+            best_plate, best_image = controller.finish()
+
+            if best_plate:
+
+                image_path = storage.save(
+                    best_plate,
+                    best_image
+                )
+
+                success, message = parking.process_vehicle(
+                    best_plate,
+                    image_path
+                )
+
+                if success:
+                    status_placeholder.success(message)
+                else:
+                    status_placeholder.error(message)
+
+            collecting = False
+
+            missing_frames = 0
+
+        rgb = cv2.cvtColor(
+            output,
+            cv2.COLOR_BGR2RGB
+        )
+
+        frame_placeholder.image(
+            rgb,
+            channels="RGB",
+            use_container_width=True
+        )
+
+    camera.release()

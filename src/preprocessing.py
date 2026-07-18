@@ -4,54 +4,68 @@ import numpy as np
 
 class PlatePreprocessor:
 
-    def process(self, image):
-
-        # -------------------------
-        # Resize
-        # -------------------------
+    def generate_variants(self, image):
+        """
+        Generate multiple versions of the same plate image.
+        Each version is optimized for different lighting conditions.
+        """
 
         image = cv2.resize(
             image,
             None,
-            fx=4,
-            fy=4,
+            fx=3,
+            fy=3,
             interpolation=cv2.INTER_CUBIC
         )
-
-        # -------------------------
-        # Gray
-        # -------------------------
 
         gray = cv2.cvtColor(
             image,
             cv2.COLOR_BGR2GRAY
         )
 
-        # -------------------------
-        # Bilateral Filter
-        # -------------------------
+        variants = []
 
-        gray = cv2.bilateralFilter(
-            gray,
-            11,
-            17,
-            17
-        )
+        # ------------------------------------------------
+        # Variant 1
+        # Original grayscale
+        # ------------------------------------------------
 
-        # -------------------------
+        variants.append(gray)
+
+        # ------------------------------------------------
+        # Variant 2
         # CLAHE
-        # -------------------------
+        # ------------------------------------------------
 
         clahe = cv2.createCLAHE(
             clipLimit=2.0,
             tileGridSize=(8, 8)
         )
 
-        gray = clahe.apply(gray)
+        clahe_img = clahe.apply(gray)
 
-        # -------------------------
+        variants.append(clahe_img)
+
+        # ------------------------------------------------
+        # Variant 3
+        # Adaptive Threshold
+        # ------------------------------------------------
+
+        threshold = cv2.adaptiveThreshold(
+            gray,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            31,
+            15
+        )
+
+        variants.append(threshold)
+
+        # ------------------------------------------------
+        # Variant 4
         # Sharpen
-        # -------------------------
+        # ------------------------------------------------
 
         kernel = np.array([
             [0, -1, 0],
@@ -65,17 +79,6 @@ class PlatePreprocessor:
             kernel
         )
 
-        # -------------------------
-        # Adaptive Threshold
-        # -------------------------
+        variants.append(sharp)
 
-        binary = cv2.adaptiveThreshold(
-            sharp,
-            255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            31,
-            15
-        )
-
-        return binary
+        return variants
